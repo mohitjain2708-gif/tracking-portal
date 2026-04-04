@@ -20,6 +20,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+const API_BASE = "https://tracking-portal-2t4o.onrender.com";
 
 function normalize(v) {
   return v == null ? "" : String(v).trim();
@@ -121,7 +122,9 @@ export default function App() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("http://127.0.0.1:8000/api/process-tracking", {
+      const API_BASE = "https://tracking-portal-2t4o.onrender.com";
+
+const res = await fetch(`${API_BASE}/api/process-tracking`, {
         method: "POST",
         body: formData,
       });
