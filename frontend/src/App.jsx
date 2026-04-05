@@ -138,6 +138,8 @@ function isRailMovementLocation(loc) {
     "INLAND",
     "MMLP",
     "WAGON",
+    "ANDAL",
+    "CABIN",
   ];
 
   return movementKeywords.some((keyword) => text.includes(keyword));
@@ -299,7 +301,7 @@ export default function App() {
     const uniqueContainerMap = new Map();
 
     filteredRows.forEach((row) => {
-      const containerNo = getVal(row, ["container no", "containerno", "container", "cntr no"]).toUpperCase();
+      const containerNo = getVal(row, ["container no", "containerno", "cntr no"]).toUpperCase();
       if (!containerNo) return;
 
       const existing = uniqueContainerMap.get(containerNo);
@@ -650,17 +652,7 @@ export default function App() {
 
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <MapPin size={15} /> Birgunj
             </div>
             <div style={{ padding: 14 }}>
@@ -672,17 +664,7 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <Ship size={15} /> Port
             </div>
             <div style={{ padding: 14 }}>
@@ -694,17 +676,7 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <Train size={15} /> Rail Movement
             </div>
             <div style={{ padding: 14 }}>
@@ -716,17 +688,7 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <Ship size={15} /> High Seas
             </div>
             <div style={{ padding: 14 }}>
@@ -740,17 +702,7 @@ export default function App() {
 
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <Train size={15} /> Movement Summary
             </div>
             <div style={{ padding: 14, display: "grid", gap: 8 }}>
@@ -761,17 +713,7 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <Clock3 size={15} /> Payment Snapshot
             </div>
             <div style={{ padding: 14, display: "grid", gap: 8 }}>
@@ -781,17 +723,7 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div
-              style={{
-                padding: 14,
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
               <BarChart3 size={15} /> Top Parties
             </div>
             <div style={{ padding: 14, display: "grid", gap: 8 }}>
@@ -824,17 +756,7 @@ export default function App() {
         </div>
 
         <div style={cardStyle}>
-          <div
-            style={{
-              padding: 14,
-              borderBottom: "1px solid #e2e8f0",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 14,
-            }}
-          >
+          <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
             <MapPin size={15} /> Top Last Locations
           </div>
           <div style={{ padding: 14, display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
