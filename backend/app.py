@@ -187,7 +187,14 @@ async def sync_google_sheet():
         }
 
     except Exception as e:
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500,
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": traceback.format_exc(),
+        },
+        status_code=500,
+    )
         )
