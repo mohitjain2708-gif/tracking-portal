@@ -4,3 +4,5 @@ python-multipart
 openpyxl
 requests
 pydantic
+gspread
+google-auth
