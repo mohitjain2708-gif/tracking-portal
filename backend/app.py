@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import traceback
 
 import gspread
 from fastapi import FastAPI, File, UploadFile
@@ -187,14 +188,12 @@ async def sync_google_sheet():
         }
 
     except Exception as e:
-    import traceback
-    traceback.print_exc()
-    return JSONResponse(
-        {
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "traceback": traceback.format_exc(),
-        },
-        status_code=500,
-    )
+        traceback.print_exc()
+        return JSONResponse(
+            {
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc(),
+            },
+            status_code=500,
         )
