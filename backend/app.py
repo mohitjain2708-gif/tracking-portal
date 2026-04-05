@@ -1,7 +1,10 @@
 import json
 import os
 import tempfile
+import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 import gspread
 from fastapi import FastAPI, File, UploadFile
@@ -25,6 +28,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =========================
+# PERFORMANCE SETTINGS
+# =========================
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "10"))
+CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "1800"))  # 30 min
+
+TRACKING_CACHE = {}
+CACHE_LOCK = Lock()
+
+
+def get_cached_tracking(container_no: str):
+    now = time.time()
+    with CACHE_LOCK:
+        entry = TRACKING_CACHE.get(container_no)
+        if not entry:
+            return None
+        if now - entry["ts"] > CACHE_TTL_SECONDS:
+            del TRACKING_CACHE[container_no]
+            return None
+        return entry["data"]
+
+
+def set_cached_tracking(container_no: str, data: dict):
+    with CACHE_LOCK:
+        TRACKING_CACHE[container_no] = {
+            "ts": time.time(),
+            "data": data,
+        }
 
 
 def get_google_client():
@@ -93,6 +125,30 @@ def write_rows_to_output_sheet(spreadsheet, headers, rows):
     ws_out.update("A1", data, value_input_option="USER_ENTERED")
 
 
+def fetch_container_data(container_no: str) -> tuple[str, dict]:
+    cached = get_cached_tracking(container_no)
+    if cached is not None:
+        return container_no, cached
+
+    ldb = {}
+    concor = {}
+    errors = []
+
+    try:
+        ldb = fetch_ldb(container_no)
+    except Exception as e:
+        errors.append(f"LDB: {e}")
+
+    try:
+        concor = fetch_concor(container_no)
+    except Exception as e:
+        errors.append(f"CONCOR: {e}")
+
+    result = {**ldb, **concor, "error": " | ".join(errors)}
+    set_cached_tracking(container_no, result)
+    return container_no, result
+
+
 def process_worksheet(ws):
     hdr_row = detect_header_row(ws)
     hmap = header_map(ws, hdr_row)
@@ -106,36 +162,33 @@ def process_worksheet(ws):
     if not container_col:
         raise ValueError("Container number column not found in OONC")
 
-    tracking_map = {}
-    preview_rows = []
+    # Collect unique containers first
+    container_numbers = []
+    seen = set()
 
     for r in range(hdr_row + 1, ws.max_row + 1):
         container_no = str(ws.cell(r, container_col).value or "").strip().upper()
         if not container_no:
             continue
-        if container_no in tracking_map:
+        if container_no in seen:
             continue
+        seen.add(container_no)
+        container_numbers.append(container_no)
 
-        ldb = {}
-        concor = {}
-        errors = []
+    tracking_map = {}
 
-        try:
-            ldb = fetch_ldb(container_no)
-        except Exception as e:
-            errors.append(f"LDB: {e}")
-
-        try:
-            concor = fetch_concor(container_no)
-        except Exception as e:
-            errors.append(f"CONCOR: {e}")
-
-        tracking_map[container_no] = {**ldb, **concor, "error": " | ".join(errors)}
+    # Parallel processing
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = [executor.submit(fetch_container_data, cn) for cn in container_numbers]
+        for future in as_completed(futures):
+            cn, data = future.result()
+            tracking_map[cn] = data
 
     update_oonc_sheet(ws, hdr_row, hmap, tracking_map)
 
     headers = [str(ws.cell(hdr_row, c).value or "") for c in range(1, ws.max_column + 1)]
 
+    preview_rows = []
     for r in range(hdr_row + 1, ws.max_row + 1):
         row = {}
         is_blank = True
@@ -155,6 +208,16 @@ def process_worksheet(ws):
     }
 
 
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok",
+        "cache_size": len(TRACKING_CACHE),
+        "max_workers": MAX_WORKERS,
+        "cache_ttl_seconds": CACHE_TTL_SECONDS,
+    }
+
+
 @app.post("/api/process-tracking")
 async def process_tracking(file: UploadFile = File(...)):
     try:
@@ -162,15 +225,14 @@ async def process_tracking(file: UploadFile = File(...)):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             in_path = os.path.join(tmpdir, f"input{suffix}")
-            out_path = os.path.join(tmpdir, f"processed{suffix}")
 
             with open(in_path, "wb") as f:
                 f.write(await file.read())
 
             wb, ws = load_workbook_and_oonc(in_path)
             result = process_worksheet(ws)
-            wb.save(out_path)
 
+            # Skipping wb.save(out_path) for speed since frontend already uses JSON response
             return result
 
     except Exception as e:

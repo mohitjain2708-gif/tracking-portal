@@ -1,7 +1,20 @@
 import requests
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 LDB_API_URL = "https://www.ldb.co.in/api/ldb/container/search"
+
+_session = requests.Session()
+_retries = Retry(
+    total=2,
+    backoff_factor=0.4,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
+_adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=_retries)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
 
 
 def _fmt_iso(ts: str) -> str:
@@ -38,7 +51,7 @@ def fetch_ldb(container_no: str) -> dict:
         "Referer": f"https://www.ldb.co.in/ldb/containersearch/39/{container_no}",
     }
 
-    resp = requests.get(LDB_API_URL, params=params, headers=headers, timeout=20)
+    resp = _session.get(LDB_API_URL, params=params, headers=headers, timeout=(5, 12))
     resp.raise_for_status()
     data = resp.json()
 
