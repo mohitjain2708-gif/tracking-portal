@@ -4,7 +4,6 @@ import {
   FileSpreadsheet,
   Search,
   RefreshCw,
-  AlertTriangle,
   Train,
   Info,
   MapPin,
@@ -99,6 +98,49 @@ function compareValues(a, b) {
     numeric: true,
     sensitivity: "base",
   });
+}
+
+function normalizeHeader(h) {
+  return String(h).replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function isBirgunjLocation(loc) {
+  const text = String(loc || "").toUpperCase();
+  return text.includes("BIRGUNJ") || text.includes("BIRGANJ");
+}
+
+function isPortLocation(loc) {
+  const text = String(loc || "").toUpperCase();
+  return (
+    text.includes("VISHAKAPATNAM") ||
+    text.includes("VIZAG") ||
+    text.includes("KOLKATA") ||
+    text.includes("HALDIA") ||
+    text.includes("PORT")
+  );
+}
+
+function isRailMovementLocation(loc) {
+  const text = String(loc || "").toUpperCase();
+  if (!text) return false;
+
+  const movementKeywords = [
+    "RAXAUL",
+    "SAMASTIPUR",
+    "DANGOAPOSI",
+    "JN",
+    "JN.",
+    "JUNCTION",
+    "ICD",
+    "RAIL",
+    "STATION CROSSED",
+    "CROSSED",
+    "INLAND",
+    "MMLP",
+    "WAGON",
+  ];
+
+  return movementKeywords.some((keyword) => text.includes(keyword));
 }
 
 export default function App() {
@@ -211,10 +253,10 @@ export default function App() {
     }
 
     const railTransitKey = headers.find(
-      (h) => String(h).replace(/\s+/g, " ").trim().toLowerCase() === "rail transit time"
+      (h) => normalizeHeader(h) === "rail transit time"
     );
     const paymentKey = headers.find((h) =>
-      String(h).replace(/\s+/g, " ").trim().toLowerCase().includes("payment status")
+      normalizeHeader(h).includes("payment status")
     );
 
     if (statusFilter !== "all" && railTransitKey) {
@@ -250,58 +292,83 @@ export default function App() {
 
   const dashboard = useMemo(() => {
     const getVal = (row, names) => {
-      const key = headers.find((h) => {
-        const normalizedHeader = String(h).replace(/\s+/g, " ").trim().toLowerCase();
-        return names.includes(normalizedHeader);
-      });
+      const key = headers.find((h) => names.includes(normalizeHeader(h)));
       return key ? normalize(row[key]) : "";
     };
 
-    const birgunjCount = filteredRows.filter((r) => {
-      const loc = getVal(r, ["last location"]);
-      return loc.toUpperCase().includes("BIRGUNJ") || loc.toUpperCase().includes("BIRGANJ");
-    }).length;
+    const uniqueContainerMap = new Map();
 
-    const portCount = filteredRows.filter((r) => {
-      const loc = getVal(r, ["last location"]).toUpperCase();
-      return (
-        loc.includes("VISHAKAPATNAM") ||
-        loc.includes("VIZAG") ||
-        loc.includes("KOLKATA") ||
-        loc.includes("HALDIA") ||
-        loc.includes("PORT")
-      );
-    }).length;
+    filteredRows.forEach((row) => {
+      const containerNo = getVal(row, ["container no", "containerno", "container", "cntr no"]).toUpperCase();
+      if (!containerNo) return;
 
-    const railCount = filteredRows.filter((r) => {
-      const loc = getVal(r, ["last location"]).toUpperCase();
-      return (
-        loc &&
-        !loc.includes("BIRGUNJ") &&
-        !loc.includes("BIRGANJ") &&
-        !loc.includes("VISHAKAPATNAM") &&
-        !loc.includes("VIZAG") &&
-        !loc.includes("KOLKATA") &&
-        !loc.includes("HALDIA") &&
-        !loc.includes("PORT")
-      );
-    }).length;
+      const existing = uniqueContainerMap.get(containerNo);
+      const currentTrainNo = getVal(row, ["train no"]);
+      const currentLastLocation = getVal(row, ["last location"]);
 
-    const highSeasCount = filteredRows.filter((r) => {
-      const loc = getVal(r, ["last location"]);
-      return !loc || loc.trim() === "";
-    }).length;
+      if (!existing) {
+        uniqueContainerMap.set(containerNo, row);
+        return;
+      }
 
-    const inTransit = railCount;
-    const arrived = birgunjCount;
-    const notRailed = portCount;
+      const existingTrainNo = getVal(existing, ["train no"]);
+      const existingLastLocation = getVal(existing, ["last location"]);
+
+      const currentScore =
+        (currentTrainNo ? 1 : 0) +
+        (currentLastLocation ? 1 : 0);
+
+      const existingScore =
+        (existingTrainNo ? 1 : 0) +
+        (existingLastLocation ? 1 : 0);
+
+      if (currentScore > existingScore) {
+        uniqueContainerMap.set(containerNo, row);
+      }
+    });
+
+    const uniqueContainers = Array.from(uniqueContainerMap.values());
+
+    let birgunjCount = 0;
+    let portCount = 0;
+    let railCount = 0;
+    let highSeasCount = 0;
+
+    uniqueContainers.forEach((row) => {
+      const trainNo = getVal(row, ["train no"]);
+      const lastLocation = getVal(row, ["last location"]);
+
+      if (isBirgunjLocation(lastLocation)) {
+        birgunjCount += 1;
+        return;
+      }
+
+      if (trainNo || isRailMovementLocation(lastLocation)) {
+        railCount += 1;
+        return;
+      }
+
+      if (isPortLocation(lastLocation)) {
+        portCount += 1;
+        return;
+      }
+
+      if (!lastLocation && !trainNo) {
+        highSeasCount += 1;
+        return;
+      }
+    });
 
     const paid = filteredRows.filter((r) =>
-      ["paid", "yes", "sent", "complete"].includes(getVal(r, ["payment status"]).toLowerCase())
+      ["paid", "yes", "sent", "complete"].includes(
+        getVal(r, ["payment status"]).toLowerCase()
+      )
     ).length;
 
     const pending = filteredRows.filter((r) =>
-      ["pending", "unpaid"].includes(getVal(r, ["payment status"]).toLowerCase())
+      ["pending", "unpaid"].includes(
+        getVal(r, ["payment status"]).toLowerCase()
+      )
     ).length;
 
     const locationCounts = {};
@@ -323,9 +390,9 @@ export default function App() {
       .slice(0, 5);
 
     return {
-      arrived,
-      notRailed,
-      inTransit,
+      arrived: birgunjCount,
+      notRailed: portCount,
+      inTransit: railCount,
       paid,
       pending,
       birgunjCount,
@@ -599,7 +666,7 @@ export default function App() {
             <div style={{ padding: 14 }}>
               <div style={{ fontSize: 26, fontWeight: 700 }}>{dashboard.birgunjCount}</div>
               <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>
-                Containers currently showing Birgunj as last location
+                Unique containers currently showing Birgunj as last location
               </div>
             </div>
           </div>
@@ -621,7 +688,7 @@ export default function App() {
             <div style={{ padding: 14 }}>
               <div style={{ fontSize: 26, fontWeight: 700 }}>{dashboard.portCount}</div>
               <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>
-                Containers still at India port side locations
+                Unique containers at port with no rail movement yet
               </div>
             </div>
           </div>
@@ -643,7 +710,7 @@ export default function App() {
             <div style={{ padding: 14 }}>
               <div style={{ fontSize: 26, fontWeight: 700 }}>{dashboard.railCount}</div>
               <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>
-                Containers currently moving through inland rail points
+                Unique containers under movement or train-assigned but not yet at Birgunj
               </div>
             </div>
           </div>
@@ -665,7 +732,7 @@ export default function App() {
             <div style={{ padding: 14 }}>
               <div style={{ fontSize: 26, fontWeight: 700 }}>{dashboard.highSeasCount}</div>
               <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>
-                Containers not yet reached port (no location data)
+                Unique containers not yet reached port (no location and no train)
               </div>
             </div>
           </div>
@@ -986,7 +1053,7 @@ export default function App() {
                     filteredRows.map((row, idx) => (
                       <tr key={idx} style={{ borderTop: "1px solid #f1f5f9" }}>
                         {headers.map((h) => {
-                          const lower = String(h).replace(/\s+/g, " ").trim().toLowerCase();
+                          const lower = normalizeHeader(h);
                           const value = row[h];
                           return (
                             <td key={h} style={{ whiteSpace: "nowrap", padding: "10px 12px", verticalAlign: "middle" }}>
@@ -997,9 +1064,7 @@ export default function App() {
                               ) : (lower === "gate in birganj" || lower === "gate in birgunj") && value ? (
                                 (() => {
                                   const dateKey = headers.find(
-                                    (header) =>
-                                      String(header).replace(/\s+/g, " ").trim().toLowerCase() ===
-                                      "last location (date)"
+                                    (header) => normalizeHeader(header) === "last location (date)"
                                   );
                                   return dateKey ? String(row[dateKey] || "") : "";
                                 })()
