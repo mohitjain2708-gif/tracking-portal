@@ -4,12 +4,9 @@ import {
   FileSpreadsheet,
   Search,
   RefreshCw,
-  CheckCircle2,
   AlertTriangle,
   Train,
-  Table2,
   Info,
-  Package,
   MapPin,
   Clock3,
   BarChart3,
@@ -25,62 +22,6 @@ const API_BASE = "https://tracking-portal-2t4o.onrender.com";
 
 function normalize(v) {
   return v == null ? "" : String(v).trim();
-}
-
-function KPI({ title, value, icon: Icon, hint }) {
-  return (
-    <div
-      style={{
-        background: "white",
-        border: "1px solid #e2e8f0",
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          alignItems: "flex-start",
-        }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: "#64748b", overflowWrap: "anywhere" }}>
-            {title}
-          </div>
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 24,
-              fontWeight: 700,
-              color: "#0f172a",
-              lineHeight: 1.1,
-            }}
-          >
-            {value}
-          </div>
-          {hint ? (
-            <div style={{ marginTop: 4, fontSize: 11, color: "#64748b", lineHeight: 1.3 }}>
-              {hint}
-            </div>
-          ) : null}
-        </div>
-        <div
-          style={{
-            background: "#f1f5f9",
-            borderRadius: 12,
-            padding: 8,
-            flex: "0 0 auto",
-          }}
-        >
-          <Icon size={16} color="#334155" />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function MiniStat({ label, value, tone = "slate" }) {
@@ -308,8 +249,6 @@ export default function App() {
   }, [rows, headers, query, statusFilter, paymentFilter, sortField, sortDirection]);
 
   const dashboard = useMemo(() => {
-    const total = filteredRows.length;
-
     const getVal = (row, names) => {
       const key = headers.find((h) => {
         const normalizedHeader = String(h).replace(/\s+/g, " ").trim().toLowerCase();
@@ -317,19 +256,6 @@ export default function App() {
       });
       return key ? normalize(row[key]) : "";
     };
-
-    const withContainer = filteredRows.filter((r) =>
-      getVal(r, ["container no", "containerno", "container", "cntr no"]).length > 0
-    ).length;
-    const arrived = filteredRows.filter((r) => getVal(r, ["rail transit time"]).toLowerCase() === "arrived").length;
-    const notRailed = filteredRows.filter((r) => getVal(r, ["rail transit time"]).toLowerCase() === "not railed").length;
-    const inTransit = total - arrived - notRailed;
-    const paid = filteredRows.filter((r) =>
-      ["paid", "yes", "sent", "complete"].includes(getVal(r, ["payment status"]).toLowerCase())
-    ).length;
-    const pending = filteredRows.filter((r) =>
-      ["pending", "unpaid"].includes(getVal(r, ["payment status"]).toLowerCase())
-    ).length;
 
     const birgunjCount = filteredRows.filter((r) => {
       const loc = getVal(r, ["last location"]);
@@ -361,6 +287,23 @@ export default function App() {
       );
     }).length;
 
+    const highSeasCount = filteredRows.filter((r) => {
+      const loc = getVal(r, ["last location"]);
+      return !loc || loc.trim() === "";
+    }).length;
+
+    const inTransit = railCount;
+    const arrived = birgunjCount;
+    const notRailed = portCount;
+
+    const paid = filteredRows.filter((r) =>
+      ["paid", "yes", "sent", "complete"].includes(getVal(r, ["payment status"]).toLowerCase())
+    ).length;
+
+    const pending = filteredRows.filter((r) =>
+      ["pending", "unpaid"].includes(getVal(r, ["payment status"]).toLowerCase())
+    ).length;
+
     const locationCounts = {};
     filteredRows.forEach((r) => {
       const loc = getVal(r, ["last location"]) || "Unknown";
@@ -380,8 +323,6 @@ export default function App() {
       .slice(0, 5);
 
     return {
-      total,
-      withContainer,
       arrived,
       notRailed,
       inTransit,
@@ -390,6 +331,7 @@ export default function App() {
       birgunjCount,
       portCount,
       railCount,
+      highSeasCount,
       topLocations,
       topParties,
     };
@@ -601,10 +543,10 @@ export default function App() {
               </div>
             </div>
             <div style={{ padding: 12, display: "flex", gap: 8, flexWrap: "wrap", overflowX: "auto" }}>
-              <MiniStat label="Containers Found" value={dashboard.withContainer} tone="blue" />
-              <MiniStat label="Arrived" value={dashboard.arrived} tone="green" />
-              <MiniStat label="In Transit" value={dashboard.inTransit} tone="amber" />
-              <MiniStat label="Not Railed" value={dashboard.notRailed} tone="red" />
+              <MiniStat label="Birgunj" value={dashboard.birgunjCount} tone="green" />
+              <MiniStat label="Port" value={dashboard.portCount} tone="red" />
+              <MiniStat label="Rail Movement" value={dashboard.railCount} tone="blue" />
+              <MiniStat label="High Seas" value={dashboard.highSeasCount} tone="amber" />
             </div>
           </div>
         ) : null}
@@ -639,16 +581,19 @@ export default function App() {
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-          <KPI title="OONC Rows" value={dashboard.total} icon={Table2} hint="Rows shown in current view" />
-          <KPI title="Containers Found" value={dashboard.withContainer} icon={Package} hint="Rows having a container number" />
-          <KPI title="Arrived" value={dashboard.arrived} icon={CheckCircle2} hint="Gate in Birganj already reached" />
-          <KPI title="Not Railed" value={dashboard.notRailed} icon={AlertTriangle} hint="No rail movement assigned yet" />
-        </div>
-
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
           <div style={cardStyle}>
-            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <MapPin size={15} /> Birgunj
             </div>
             <div style={{ padding: 14 }}>
@@ -660,7 +605,17 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <Ship size={15} /> Port
             </div>
             <div style={{ padding: 14 }}>
@@ -672,7 +627,17 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <Train size={15} /> Rail Movement
             </div>
             <div style={{ padding: 14 }}>
@@ -682,11 +647,43 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          <div style={cardStyle}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
+              <Ship size={15} /> High Seas
+            </div>
+            <div style={{ padding: 14 }}>
+              <div style={{ fontSize: 26, fontWeight: 700 }}>{dashboard.highSeasCount}</div>
+              <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>
+                Containers not yet reached port (no location data)
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
           <div style={cardStyle}>
-            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <Train size={15} /> Movement Summary
             </div>
             <div style={{ padding: 14, display: "grid", gap: 8 }}>
@@ -697,7 +694,17 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <Clock3 size={15} /> Payment Snapshot
             </div>
             <div style={{ padding: 14, display: "grid", gap: 8 }}>
@@ -707,7 +714,17 @@ export default function App() {
           </div>
 
           <div style={cardStyle}>
-            <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <BarChart3 size={15} /> Top Parties
             </div>
             <div style={{ padding: 14, display: "grid", gap: 8 }}>
@@ -740,7 +757,17 @@ export default function App() {
         </div>
 
         <div style={cardStyle}>
-          <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+          <div
+            style={{
+              padding: 14,
+              borderBottom: "1px solid #e2e8f0",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 14,
+            }}
+          >
             <MapPin size={15} /> Top Last Locations
           </div>
           <div style={{ padding: 14, display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
